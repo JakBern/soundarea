@@ -303,6 +303,8 @@ function defineInstrument(instArr) {
     let osc_unproc = [];;
     let in_routing = false;
     let defining_osc = false;
+    let halves;
+    let params = {vibrato: 0, vibratoRate: 10, tremolo: 0, tremoloRate: 10};
     for (let i = 1; i < instArr.length; i++) {
         if (!in_routing && !defining_osc) {
             switch (instArr[i].slice(0, 3)) {
@@ -313,17 +315,66 @@ function defineInstrument(instArr) {
                     defining_osc = true;
                     osc_unproc.push(instArr[i]);
                     continue;
+                case ("vib"):
+                    halves = instArr[i].split(':');
+                    if (halves[0].toLowerCase() === "vibrato") {
+                        params.vibrato = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                        continue;
+                    }
+                    else if (halves[0].toLowerCase() === "vibratorate") {
+                        params.vibratoRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                        continue;
+                    }
+                    continue;
+                case ("tre"):
+                    halves = instArr[i].split(':');
+                    if (halves[0].toLowerCase() === "tremolo") {
+                        params.tremolo = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                        continue;
+                    }
+                    else if (halves[0].toLowerCase() === "tremolorate") {
+                        params.tremoloRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                        continue;
+                    }
+                    continue;
             }
         }
 
         if (in_routing) {
             if (instArr[i].search(":") == -1) {
                 routing_info_unproc.push(instArr[i]);
+                continue;
             }
             else {
                 in_routing = false;
-                defining_osc = true;
-                osc_unproc.push(instArr[i]);
+                switch (instArr[i].slice(0, 3)) {
+                    case ("osc"):
+                        defining_osc = true;
+                        osc_unproc.push(instArr[i]);
+                        continue;
+                    case ("vib"):
+                        defining_osc = false;
+                        halves = instArr[i].split(':');
+                        if (halves[0].toLowerCase() === "vibrato") {
+                            params.vibrato = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                            continue;
+                        }
+                        else if (halves[0].toLowerCase() === "vibratorate") {
+                            params.vibratoRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                            continue;
+                        }
+                    case ("tre"):
+                        defining_osc = false;
+                        halves = instArr[i].split(':');
+                        if (halves[0].toLowerCase() === "tremolo") {
+                            params.tremolo = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                            continue;
+                        }
+                        else if (halves[0].toLowerCase() === "tremolorate") {
+                            params.tremoloRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                            continue;
+                        }
+                }
             }
         }
 
@@ -339,33 +390,141 @@ function defineInstrument(instArr) {
                     in_routing = true;
                 }
                 else {
-                    osc_unproc.push(instArr[i]);
+                    switch (instArr[i].slice(0, 3)) {
+                        case ("osc"):
+                            defining_osc = true;
+                            osc_unproc.push(instArr[i]);
+                            continue;
+                        case ("vib"):
+                            defining_osc = false;
+                            halves = instArr[i].split(':');
+                            if (halves[0].toLowerCase() === "vibrato") {
+                                params.vibrato = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                                continue;
+                            }
+                            else if (halves[0].toLowerCase() === "vibratorate") {
+                                params.vibratoRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                                continue;
+                            }
+                        case ("tre"):
+                            defining_osc = false;
+                            halves = instArr[i].split(':');
+                            if (halves[0].toLowerCase() === "tremolo") {
+                                params.tremolo = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 0 : Number(halves[1]);
+                                continue;
+                            }
+                            else if (halves[0].toLowerCase() === "tremolorate") {
+                                params.tremoloRate = isNaN(Number(halves[1])) || 0 > Number(halves[1]) ? 10 : Number(halves[1]);
+                                continue;
+                            }
+                    }
                     continue;
                 }
             }
         }
     }
+    let inst = new Instrument(oscs, name)
     routing = processRouting(routing_info_unproc);
-    connectRouting(oscs, routing);
+    connectRouting(inst, oscs, routing);
 }
 
 function makeOsc(oscArr) {
-    
     let oscNum = Number(oscArr[0].slice(1, oscArr[0].search(":")));
     // no error handling yet -- too tired
-    let params = {type: "sine", vol: 1, detune: 0, freqMult: 1, lfo=false};
+    let params = {type: "sine", vol: 1, detune: 0, freqMult: 1, lfo: false};
     for (let i = 1; i < oscArr.length; i++) {
-
+        let curParam =oscArr[i].split(':');
+        switch (curParam[0].toLowerCase()) {
+            case ("type"): 
+                params.type = curParam[1].toLowerCase();
+                break;
+            case ("vol"): 
+                params.vol = isNaN(Number(curParam[1])) || 0 > Number(curParam[1]) ? 1 : Number(curParam[1]);
+                break;
+            case ("detune"): 
+                params.detune = isNaN(Number(curParam[1])) ? 1 : Number(curParam[1]);
+                break;
+            case ("freqmult"): 
+                params.freqmult = isNaN(Number(curParam[1])) || 0 > Number(curParam[1]) ? 1 : Number(curParam[1]);
+                break;
+            case ("lfo"):
+                params.lfo = (curParam[1].toLowerCase().trim() === "true" || curParam[1].toLowerCase().trim() === "yes");
+                break;
+            default:
+                continue;
+        }
     }
-
+    let output = {};
+    output.oscNum = oscNum;
+    output.osc = new Osc(params.type, params.vol, params.detune, params.freqmult, params.lfo);
+    return output;
 }
 
 function processRouting(routing) {
-
+    let routing_arr = [];
+    // routing object has 3 params:
+    // - type (am, fm, normal)
+    // - dest (single osc (or a gain))
+    // - src  (array of oscs)
+    for (let i = 0; i < routing.length; i++) {
+        let route = {type: "normal", dest: null, src: []};
+        let cur = routing[i].split('<');
+        switch (cur[0].trim()) {
+            case ("out"): 
+                route.dest = -1;
+            default:
+                route.dest = (cur[0].trim.slice(3));
+                route.dest = isNaN(Number(route.dest)) ? -2 : Number(route.dest);
+        }
+        cur[1] = cur[1].trim();
+        if (cur[1].slice(0,2).toLowerCase().trim() == "am") {
+            route.type = "am";
+        }
+        if (cur[1].slice(0,2).toLowerCase().trim() == "fm") {
+            route.type = "fm";
+        }
+        route.src = cur[1].slice(2).split('&');
+        for (let i = 0; i < route.src.length; i++) {
+            route.src[i] = route.src[i].trim().slice(3);
+            route.src[i] = isNaN(Number(route.src[i])) ? -2 : Number(route.src[i]);
+        }
+        if (route.dest == -2) {
+            continue;
+        }
+        else {
+            routing_arr.push(route);
+        }
+    }
 }
 
-function connectRouting(oscs, routing) {
-
+function connectRouting(inst, oscs, routing) {
+    for (let i = 0; i < routing; i++) {
+        let dest;
+        switch (routing.dest) {
+            case (-1): 
+                dest = inst.out;
+            default:
+                dest = oscs[routing.dest];
+        }
+        for (let j = 0; j < routing[i].src.length; j++) {
+            let src = routing[i].src[j];
+            if (src == -2) {
+                continue;
+            }
+            src = oscs[src];
+            switch (routing[i].type) {
+                case ("normal"):
+                    oscConnect(src, dest);
+                    continue;
+                case ("fm"):
+                    oscFMConnect(src, dest);
+                    continue;
+                case ("am"):
+                    oscFMConnect(src, dest);
+                    continue;
+            }
+        }
+    }
 }
 
 // ===        END FOOTER PARSING        === 
@@ -576,12 +735,12 @@ function oscAMConnect(src, dest) {
 }
 
 let baseInstruments = {};
-baseInstruments.sine = Instrument();
-baseInstruments.square = Instrument(oscs=[new Osc(type="square")], "square");
-baseInstruments.triangle = Instrument(oscs=[new Osc(type="triangle")], "triangle");
-baseInstruments.saw = Instrument(oscs=[new Osc(type="saw")], "saw");
-baseInstruments.noise = Instrument(oscs=[new Osc(type="noise")], "noise");
-baseInstruments.pitchednoise = Instrument(oscs=[new Osc(type="pitchednoise")], "pitchednoise");
+baseInstruments.sine = new Instrument();
+baseInstruments.square = new Instrument(oscs=[new Osc(type="square")], "square");
+baseInstruments.triangle = new Instrument(oscs=[new Osc(type="triangle")], "triangle");
+baseInstruments.saw = new Instrument(oscs=[new Osc(type="saw")], "saw");
+baseInstruments.noise = new Instrument(oscs=[new Osc(type="noise")], "noise");
+baseInstruments.pitchednoise = new Instrument(oscs=[new Osc(type="pitchednoise")], "pitchednoise");
 
 let isBuiltInInstrument = {};
 isBuiltInInstrument.sine = true;
