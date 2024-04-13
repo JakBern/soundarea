@@ -72,18 +72,199 @@ input[type='number'] {
 </div>
 <div class="centro">
 <h1>&ltsoundarea&gt</h1>
+
 </div>
+
 <br>
-<br>
+<div class="centro">
+<h2 id="song-title">"Untitled Song"</h2>
+</div>
+
 <br>
 <div class="centro">
 
-<textarea rows="30" cols="140"></textarea>
+<textarea id="soundarea" rows="30" cols="140"></textarea>
 </div>
 </body>
 
 </html>
 
 <script>
-    
+
+// ========================================
+//                GLOBALS
+// ----------------------------------------
+
+// soundarea itself
+let textarea = document.getElementById("soundarea");
+// textarea.onkeyup = function(){
+//     var callcount = 0;
+//     var action = function(){
+//         alert('changed');
+//     }
+//     var delayAction = function(action, time){
+//         var expectcallcount = callcount;
+//         var delay = function(){
+//             if(callcount == expectcallcount){
+//                 action();
+//             }
+//         }
+//         setTimeout(delay, time);
+//     }
+//     return function(eventtrigger){
+//         ++callcount;
+//         delayAction(action, 1200);
+//     }
+// }();
+
+// various buttons and dials
+let playButton = document.getElementById("play-button");
+let stopButton = document.getElementById("stop-button");
+let volCtrl = document.getElementById("vol-ctrl");
+let loopCtrl = document.getElementById("loop-ctrl");
+
+let ctx = window.AudioContext || window.webkitAudioContext;
+
+let titleSpace = document.getElementById("song-title");
+
+// ----------------------------------------
+//              END GLOBALS
+// ========================================
+
+
+
+// ========================================
+//               SONG STRUCT
+// ----------------------------------------
+
+// Master... Is it true?
+let master = {};
+master.out = ctx.createGain();
+master.out.connect(ctx.destination);
+master.bpm = 90;
+master.timeSig = {num: 4, denom: 4};
+master.tracks = [];
+master.beatDiv = 8;
+master.name = "Untitled Song";
+
+
+// ----------------------------------------
+//              END SONG STRUCT
+// ========================================
+
+
+
+// ========================================
+//                PARSING
+// ----------------------------------------
+
+
+
+// ----------------------------------------
+//               END PARSING
+// ========================================
+
+
+
+// ========================================
+//              TRACK OBJECTS
+// ----------------------------------------
+
+function Track(inst=baseInstruments.sine, 
+                seq=[], vol=1.0, 
+                loop=false, 
+                sig=master.timeSig, 
+                div=master.beatDiv)         {
+
+    this.instrument = instr;
+    this.seq = seq;
+    this.vol = vol;
+    this.loop = loop;
+    this.timeSig = sig;
+    this.div = master.beatDiv;
+    this.timeTilQueued = 0;
+}
+
+// ----------------------------------------
+//             END TRACK OBJECTS
+// ========================================
+
+// ========================================
+//          TRACK SEGMENT OBJECTS
+// ----------------------------------------
+
+function TrackSeg(loop=false,
+                    startTime=0)         {
+
+    this.loop = loop;
+    this.startTime = startTime;
+    this.noteQueue = [];
+    this.nqPtr = 0;
+}
+
+// ----------------------------------------
+//        END TRACK SEGMENT OBJECTS
+// ========================================
+
+
+// ========================================
+//              NOTE OBJECTS
+// ----------------------------------------
+
+function Note(freq, vol, vib, trem, detune, gliss={}) {
+    this.freq = freq;
+    this.vol = vol;
+    this.vib = vib;
+    this.trem = trem;
+    this.detune = detune;  
+    this.gliss = {}
+}
+
+// ----------------------------------------
+//            END NOTE OBJECTS
+// ========================================
+
+
+// ========================================
+//           INSTRUMENT OBJECTS
+// ----------------------------------------
+
+
+// ----------------------------------------
+//             END INSTRUMENTS
+// ========================================
+
+
+
+// ========================================
+//             TRACK SCHEDULING
+// ----------------------------------------
+
+
+// ----------------------------------------
+//           END TRACK SCHEDULING
+// ========================================
+
+
+
+// ========================================
+//            TRACK PLAYBACK
+// ----------------------------------------
+
+
+// ----------------------------------------
+//           END TRACK PLAYBACK
+// ========================================
+
+
+// ========================================
+//           HELPFUL FUNCTIONS
+// ----------------------------------------
+
+
+// ----------------------------------------
+//           END TRACK PLAYBACK
+// ========================================
+
+
 </script>
