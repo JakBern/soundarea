@@ -101,6 +101,7 @@ input[type='number'] {
 
 // soundarea itself
 let textarea = document.getElementById("soundarea");
+// don't do this unless the play button has been pressed
 // textarea.onkeyup = function(){
 //     var callcount = 0;
 //     var action = function(){
@@ -145,11 +146,26 @@ let master = {};
 master.out = ctx.createGain();
 master.out.connect(ctx.destination);
 master.bpm = 90;
+master.beatLen = (60 / master.bpm) * ctx.sampleRate;
 master.timeSig = {num: 4, denom: 4};
 master.tracks = [];
+master.instruments = {};
 master.queue = [];
 master.beatDiv = 8;
+master.beatDivLen = master.beatLen / master.beatDiv;
 master.name = "Untitled Song";
+
+buffToMaster = {};
+buffToMaster.bpm = 90;
+buffToMaster.beatLen = (60 / buffToMaster.bpm) * ctx.sampleRate;
+buffToMaster.timeSig = {num: 4, denom: 4};
+buffToMaster.tracks = [];
+buffToMaster.instruments = {};
+buffToMaster.queue = [];
+buffToMaster.beatDiv = 8;
+buffToMaster.beatDivLen = buffToMaster.beatLen / buffToMaster.beatDiv;
+buffToMaster.name = "Untitled Song";
+
 
 
 // ----------------------------------------
@@ -162,7 +178,11 @@ master.name = "Untitled Song";
 //                PARSING
 // ----------------------------------------
 
+
 function parseState(state) {
+    buffToMaster.tracks = [];
+    buffToMaster.instruments = {};
+    buffToMaster.queue = [];
     state = state.split(/=+/);
     header = removeComments(state[0].split(/\n/));
     body = removeComments(state[1].split(/\n/));
@@ -170,28 +190,199 @@ function parseState(state) {
     parseHeader(header);
     parseBody(body);
     parseFooter(footer);
+    masterSetup();
 }
+
+
+// ===          HEADER PARSING          === 
 
 // arr of strings
 function parseHeader(header) {
     for (let i = 0; i < header.length; i++) {
-
+        switch (header[i].subs(0,3)) {
+            case ("tit"):
+                buffToMaster.name = header[i].slice(header[i].search(":") + 1).trim();
+                break;
+            case ("bpm"):
+                let spec_bpm = Number(header[i].slice(header[i].search(":") + 1));
+                if (isNaN(spec_bpm)) {
+                    break;
+                }
+                buffToMaster.bpm = spec_bpm;
+                buffToMaster.beatLen = (60 / buffToMaster.bpm) * ctx.sampleRate;
+            case ("tim"):
+                let sig = header[i].slice(header[i].search(":") + 1);
+                sig = sig.split("/");
+                let num = Number(sig[0]);
+                let denom = Number(sig[1]);
+                if (isNaN(num) || isNan(denom)) {
+                    break;
+                }
+                buffToMaster.timeSig = {num: num, denom: denom};
+                break;
+            case ("bea"):
+                let div = Number(header[i].slice(header[i].search(":") + 1));
+                if (isNaN(div)) {
+                    break;
+                }
+                buffToMaster.beatDiv = div;
+                buffToMaster.beatDivLen = buffToMaster.beatLen / buffToMaster.beatDiv;
+                break;
+            case ("tra"): 
+                parseTracksHeader(header.slice(i));
+                return;
+        }
     }
 }
+
+function parseTracksHeader(tracks) {
+    for (let i = 0; i < tracks.length; i++) {
+        switch (tracks[i].slice(0,5)) {
+            case ("track"):
+                let trackNum = Number(tracks[i].substring(5, tracks[i].search(":")));
+                if (isNaN(trackNum)) {
+                    break;
+                }
+                else {
+                    let inst = tracks[i].substring(tracks[i].search(":") + 1);
+                    buffToMaster.tracks[trackNum] = new Track(
+                        customInstrument = {
+                            isCustom:(baseInstruments[isnt] === undefined),
+                            name: inst
+                            }
+                        );
+                }
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+// ===       END HEADER PARSING         === 
+
+
+// ===           BODY PARSING           === 
+
+
+function parseBody(body) {
+
+}
+
+// ===       END BODY PARSING           === 
+
+
+
+// ===         FOOTER PARSING           === 
+
+function parseFooter(footer) {
+    let inst_decls = [];
+    for (let i = 0; i < footer.length; i++) {
+        if (footer[i][0] == '#') {
+            inst_decls.push(i);
+        }
+    }
+    for (let i = 0; i < inst_decls.length; i++) {
+        let newInst = defineInstrument(footer.slice(inst_decls[i], 
+                                    ((inst_decls[i + 1] === undefined) ? inst_decls.length : inst_decls[i+1])));
+        if (newInst === null) {
+            continue;
+        }
+        else {
+            buffToMaster.instruments[newInst.name] = newInst;
+        }
+    }
+    return;
+}
+
+function defineInstrument(instArr) {
+    let name = instArr[0].slice(1).trim();
+    let oscs = [];
+    let routing = [];
+    let routing_info_unproc = [];
+    let osc_unproc = [];;
+    let in_routing = false;
+    let defining_osc = false;
+    for (let i = 1; i < instArr.length; i++) {
+        if (!in_routing && !defining_osc) {
+            switch (instArr[i].slice(0, 3)) {
+                case("rou"):
+                    in_routing = true;
+                    continue;
+                case("osc"):
+                    defining_osc = true;
+                    osc_unproc.push(instArr[i]);
+                    continue;
+            }
+        }
+
+        if (in_routing) {
+            if (instArr[i].search(":") == -1) {
+                routing_info_unproc.push(instArr[i]);
+            }
+            else {
+                in_routing = false;
+                defining_osc = true;
+                osc_unproc.push(instArr[i]);
+            }
+        }
+
+        if (in_osc) {
+            if (instArr[i].search(":") == -1) {
+                osc_unproc.push(instArr[i]);
+            }
+            else {
+                let oscTemp = makeOsc(osc_unproc);
+                oscs[oscTemp.oscNum] = oscTemp.osc;
+                osc_unproc = [];
+                if (instArr[i].slice(0, 3) == "rou") {
+                    in_routing = true;
+                }
+                else {
+                    osc_unproc.push(instArr[i]);
+                    continue;
+                }
+            }
+        }
+    }
+    routing = processRouting(routing_info_unproc);
+    connectRouting(oscs, routing);
+}
+
+function makeOsc(oscArr) {
+    
+    let oscNum = Number(oscArr[0].slice(1, oscArr[0].search(":")));
+    // no error handling yet -- too tired
+    let params = {type: "sine", vol: 1, detune: 0, freqMult: 1, lfo=false};
+    for (let i = 1; i < oscArr.length; i++) {
+
+    }
+
+}
+
+function processRouting(routing) {
+
+}
+
+function connectRouting(oscs, routing) {
+
+}
+
+// ===        END FOOTER PARSING        === 
 
 function removeComments(arr) {
     let newArr = [];
     for (let i = 0; i < arr.length; i++) {
         let ind = arr[i].search(/\/\//);
         if (ind == -1) {
-            newArr.push(arr[i]);
+            newArr.push(arr[i].trim());
         }
         let newStr = arr[i].substr(0, ind);
         if (newStr == "") {
             continue;
         }
         else {
-            newArr.push(newStr);
+            newArr.push(newStr.trim());
         }
     }
     return newArr;
@@ -209,18 +400,17 @@ function removeComments(arr) {
 // ----------------------------------------
 
 function Track(inst=baseInstruments.sine, 
-                seq=[], vol=1.0, 
+                seq=[],
                 loop=0, 
-                sig=master.timeSig, 
-                div=master.beatDiv)         {
+                customInstrument={isCustom: false, name: "sine"})         {
 
     this.instrument = instr;
     this.seq = seq;
-    this.vol = vol;
     this.loop = loop;
-    this.timeSig = sig;
-    this.div = master.beatDiv;
     this.timeTilQueued = 0;
+    this.customInstrument = customInstrument;
+    // needs to be set up later to be directed to master output
+    this.trackOut = ctx.createGain();
     // in samples
     this.length;
 }
@@ -234,12 +424,18 @@ function Track(inst=baseInstruments.sine,
 // ----------------------------------------
 
 function TrackSeg(loop=0,
-                    startTime=0)         {
+                    startTime=0,
+                    sig=master.timeSig, 
+                    div=master.beatDiv,
+                    vol=1)         {
 
     this.loop = loop;
     this.startTime = startTime;
     // in samples
     this.length;
+    this.timeSig = sig;
+    this.div = div;
+    this.vol = vol;
     this.noteQueue = [];
     this.nqPtr = 0;
 }
@@ -261,7 +457,7 @@ function Note(freq, vol, vib, trem, detune, length, gliss={}) {
     this.detune = detune;
     // in samples
     this.length = length;  
-    this.gliss = {}
+    this.gliss = {};
 }
 
 // ----------------------------------------
@@ -273,12 +469,10 @@ function Note(freq, vol, vib, trem, detune, length, gliss={}) {
 //           INSTRUMENT OBJECTS
 // ----------------------------------------
 
-function Instrument(oscs=[new Osc()], vol=1, vibrato=0, vibratoRate=10, tremolo=0, tremoloRate=10) {
+function Instrument(oscs=[new Osc()],  name="sine", vibrato=0, vibratoRate=10, tremolo=0, tremoloRate=10) {
     this.out = ctx.createGain();
-    this.vol = vol;
-    this.out.gain.value = vol;
     this.oscs = oscs;
-
+    this.name = name;
     this.vibrato = vibrato;
     this.vibratoGain = ctx.createGain();
     this.vibratoGain.gain.value = vibrato * 10;
@@ -383,11 +577,19 @@ function oscAMConnect(src, dest) {
 
 let baseInstruments = {};
 baseInstruments.sine = Instrument();
-baseInstruments.square = Instrument(oscs=[new Osc(type="square")]);
-baseInstruments.triangle = Instrument(oscs=[new Osc(type="triangle")]);
-baseInstruments.saw = Instrument(oscs=[new Osc(type="saw")]);
-baseInstruments.noise = Instrument(oscs=[new Osc(type="noise")]);
-baseInstruments.pitchednoise = Instrument(oscs=[new Osc(type="pitchednoise")]);
+baseInstruments.square = Instrument(oscs=[new Osc(type="square")], "square");
+baseInstruments.triangle = Instrument(oscs=[new Osc(type="triangle")], "triangle");
+baseInstruments.saw = Instrument(oscs=[new Osc(type="saw")], "saw");
+baseInstruments.noise = Instrument(oscs=[new Osc(type="noise")], "noise");
+baseInstruments.pitchednoise = Instrument(oscs=[new Osc(type="pitchednoise")], "pitchednoise");
+
+let isBuiltInInstrument = {};
+isBuiltInInstrument.sine = true;
+isBuiltInInstrument.square = true;
+isBuiltInInstrument.triangle = true;
+isBuiltInInstrument.saw = true;
+isBuiltInInstrument.noise = true;
+isBuiltInInstrument.pitchednoise = true;
 
 // ----------------------------------------
 //             END INSTRUMENTS
@@ -420,6 +622,7 @@ baseInstruments.pitchednoise = Instrument(oscs=[new Osc(type="pitchednoise")]);
 //           HELPFUL FUNCTIONS
 // ----------------------------------------
 
+// taken from some stackoverflow because i was too lazy
 function setCharAt(str,index,chr) {
     if(index > str.length-1) return str;
     return str.substring(0,index) + chr + str.substring(index+1);
@@ -438,6 +641,8 @@ function setCharAt(str,index,chr) {
 //             WHITE NOISE
 // ----------------------------------------
 
+
+// taken from mdn web docs
 const noiseBuffer = new AudioBuffer({
   length: ctx.sampleRate,
   sampleRate: ctx.sampleRate,
