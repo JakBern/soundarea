@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>&ltsoundarea&gt</title>
+<style>
+div.centro {
+        display: flex;
+        justify-content: center;
+    }
+div.l-sidebar {
+    background: gainsboro;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 14%;
+    height: 100%;
+}
+
+div.r-sidebar {
+    background: gainsboro;
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 14%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+div.sidebar-button-container {
+    margin-top: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+div.bar-row {
+    padding-top: 10%;
+    display: flex;
+    justify-content: center;
+    vertical-align: auto;
+    text-align: center;
+    column-gap: 3%;
+}
+input[type='number'] {
+    width: 3em;
+}
+
+</style>
+</head>
+<body>
+<div class="r-sidebar">
+    <div class="sidebar-button-container">
+        <div class="bar-row">
+            <button id="play-button">Play/Pause</button>
+            <button id="stop button">Stop</button>
+        </div>
+        <div class="bar-row">
+            <span>
+            <label>Vol</label>
+            <input type="number" id="vol-ctrl" step="0.1" max="4" min="0"value="1">
+            </input>
+            </span>
+            <div display="flex" justify-content="center">
+            <label>Loop</label>
+            <input type="checkbox" id="loop-ctrl"></input>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="l-sidebar">
+</div>
+<div class="centro">
+<h1>&ltsoundarea&gt</h1>
+</div>
+<br>
+<br>
+<br>
+<div class="centro">
+
+<textarea rows="30" cols="140"></textarea>
+</div>
+</body>
+
+</html>
+
+<script>
+    
+</script>
