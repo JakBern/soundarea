@@ -45,6 +45,10 @@ input[type='number'] {
     width: 3em;
 }
 
+#soundarea {
+    max-width: 70%;
+}
+
 </style>
 </head>
 <body>
@@ -137,7 +141,6 @@ let titleSpace = document.getElementById("song-title");
 //               SONG STRUCT
 // ----------------------------------------
 
-// Master... Is it true?
 let master = {};
 master.out = ctx.createGain();
 master.out.connect(ctx.destination);
@@ -159,6 +162,40 @@ master.name = "Untitled Song";
 //                PARSING
 // ----------------------------------------
 
+function parseState(state) {
+    state = state.split(/=+/);
+    header = removeComments(state[0].split(/\n/));
+    body = removeComments(state[1].split(/\n/));
+    footer = removeComments(state[2].split(/\n/));
+    parseHeader(header);
+    parseBody(body);
+    parseFooter(footer);
+}
+
+// arr of strings
+function parseHeader(header) {
+    for (let i = 0; i < header.length; i++) {
+
+    }
+}
+
+function removeComments(arr) {
+    let newArr = [];
+    for (let i = 0; i < arr.length; i++) {
+        let ind = arr[i].search(/\/\//);
+        if (ind == -1) {
+            newArr.push(arr[i]);
+        }
+        let newStr = arr[i].substr(0, ind);
+        if (newStr == "") {
+            continue;
+        }
+        else {
+            newArr.push(newStr);
+        }
+    }
+    return newArr;
+}
 
 
 // ----------------------------------------
@@ -184,6 +221,8 @@ function Track(inst=baseInstruments.sine,
     this.timeSig = sig;
     this.div = master.beatDiv;
     this.timeTilQueued = 0;
+    // in samples
+    this.length;
 }
 
 // ----------------------------------------
@@ -199,6 +238,8 @@ function TrackSeg(loop=0,
 
     this.loop = loop;
     this.startTime = startTime;
+    // in samples
+    this.length;
     this.noteQueue = [];
     this.nqPtr = 0;
 }
@@ -212,12 +253,14 @@ function TrackSeg(loop=0,
 //              NOTE OBJECTS
 // ----------------------------------------
 
-function Note(freq, vol, vib, trem, detune, gliss={}) {
+function Note(freq, vol, vib, trem, detune, length, gliss={}) {
     this.freq = freq;
     this.vol = vol;
     this.vib = vib;
     this.trem = trem;
-    this.detune = detune;  
+    this.detune = detune;
+    // in samples
+    this.length = length;  
     this.gliss = {}
 }
 
@@ -246,6 +289,9 @@ function Instrument(oscs=[new Osc()], vol=1, vibrato=0, vibratoRate=10, tremolo=
                     });
 
     for (let i = 0; i < this.oscs.length; i++) {
+        if (this.oscs[i].lfo) {
+            continue;
+        }
         this.vibratoGain.connect(oscs[i].osc.detune);
         this.oscs[i].osc.start();
     }
@@ -260,8 +306,11 @@ function Instrument(oscs=[new Osc()], vol=1, vibrato=0, vibratoRate=10, tremolo=
                     });
     this.tremoloGain.connect(this.out); 
 
-    this.setFreq(freq) {
+    this.setFreq = function(freq) {
         for (let i = 0; i < this.oscs.length; i++) {
+            if (this.oscs[i].lfo) {
+                continue;
+            }
             if (this.oscs[i].type == "noise") {
                 continue;
             }
@@ -269,46 +318,67 @@ function Instrument(oscs=[new Osc()], vol=1, vibrato=0, vibratoRate=10, tremolo=
                 this.oscs[i].osc.detune.value = (440 - freq) * 100 * oscs[i].freqMult;
                 continue;
             }
+
             this.oscs[i].osc.frequency.value = freq * oscs[i].freqMult;
             continue;
         }
     }
 }
 
-function Osc(type="sine", vol=1, detune=0, freqMult=1) {
+function Osc(type="sine", vol=1, detune=0, freqMult=1, lfo=false) {
     this.type = type;
     this.freqMult = freqMult;
     this.detune = detune;
     this.out = ctx.createGain();
     this.volume = vol;
     this.out.gain.value = vol;
+    this.lfo = lfo;
     switch (type) {
         case ("pitchednoise"):
         case ("noise"):
             this.osc = new AudioBufferSourceNode(ctx, {
-                buffer: noiseBuffer,
+                buffer: noiseBuffer
                 });
             this.osc.loop = true;
             break;
         case ("triangle"):
             this.osc = new OscillatorNode(ctx,
-                    {type: "triangle"});
+                    {type: "triangle", detune: this.detune});
             break;
         case ("saw"):
             this.osc = new OscillatorNode(ctx,
-                    {type: "sawtooth"});
+                    {type: "sawtooth", detune: this.detune});
             break;
         case ("square"):
             this.osc = new OscillatorNode(ctx,
-                    {type: "square"});
+                    {type: "square", detune: this.detune});
             break;
         case ("sine"):
         default:
             this.osc = new OscillatorNode(ctx,
-                    {type: "sine"});
+                    {type: "sine", detune: this.detune});
             break;
     }
     
+}
+
+function oscConnect(src, dest) {
+    src.connect(dest);
+}
+
+function oscFMConnect(src, dest) {
+    switch (dest.type) {
+        case ("noise"):
+        case ("pitchednoise"):
+            break;
+        default:
+            src.connect(dest.osc.frequency);
+            break;
+    }
+}
+
+function oscAMConnect(src, dest) {
+        src.connect(dest.out.gain);
 }
 
 let baseInstruments = {};
