@@ -123,7 +123,7 @@ let stopButton = document.getElementById("stop-button");
 let volCtrl = document.getElementById("vol-ctrl");
 let loopCtrl = document.getElementById("loop-ctrl");
 
-let ctx = window.AudioContext || window.webkitAudioContext;
+let ctx = new AudioContext() || new webkitAudioContext();
 
 let titleSpace = document.getElementById("song-title");
 
@@ -144,6 +144,7 @@ master.out.connect(ctx.destination);
 master.bpm = 90;
 master.timeSig = {num: 4, denom: 4};
 master.tracks = [];
+master.queue = [];
 master.beatDiv = 8;
 master.name = "Untitled Song";
 
@@ -172,7 +173,7 @@ master.name = "Untitled Song";
 
 function Track(inst=baseInstruments.sine, 
                 seq=[], vol=1.0, 
-                loop=false, 
+                loop=0, 
                 sig=master.timeSig, 
                 div=master.beatDiv)         {
 
@@ -193,7 +194,7 @@ function Track(inst=baseInstruments.sine,
 //          TRACK SEGMENT OBJECTS
 // ----------------------------------------
 
-function TrackSeg(loop=false,
+function TrackSeg(loop=0,
                     startTime=0)         {
 
     this.loop = loop;
@@ -229,6 +230,78 @@ function Note(freq, vol, vib, trem, detune, gliss={}) {
 //           INSTRUMENT OBJECTS
 // ----------------------------------------
 
+function Instrument(oscs=new Osc(), vibrato=0, vibratoRate=10, tremolo=0, tremoloRate=10) {
+    this.out = ctx.createGain();
+    this.oscs = oscs;
+
+    this.vibrato = vibrato;
+    this.vibratoGain = ctx.createGain();
+    this.vibratoGain.gain.value = vibrato * 10;
+    this.vibrato.connect(this.vibratoGain);
+    this.vibratoOsc = new OscillatorNode(ctx,
+                    {type: "sine",
+                    frequency: vibratoRate
+                    });
+
+    for (let i = 0; i < this.oscs.length; i++) {
+        this.vibratoGain.connect(oscs[i].out.detune);
+        this.oscs[i].start();
+    }
+    
+    this.tremolo = tremolo;
+    this.tremoloGain = ctx.createGain();
+    this.tremoloGain.gain.value = tremolo * 10;
+    this.tremolo.connect(this.tremoloGain);
+    this.tremoloOsc = new OscillatorNode(ctx,
+                    {type: "sine",
+                    frequency: tremoloRate
+                    });
+    this.tremoloGain.connect(this.out); 
+
+    this.setFreq(freq) {
+        for (let i = 0; i < this.oscs.length; i++) {
+            if (this.oscs[i].type == "noise") {
+                continue;
+            }
+            if (this.oscs[i].type == "pitchednoise") {
+                this.oscs[i].detune.value = 
+                continue;
+            }
+        }
+    }
+}
+
+function setInstFreq(freq) {
+
+}
+
+function Osc(type="sine", vol=1, detune=0, freqMult=1) {
+    this.type = type;
+    // need switch here for noise types etc.
+    this.freqMult = freqMult;
+    this.detune = detune;
+    switch (type) {
+        case ("noise"):
+            this.out = new OscillatorNode(ctx,
+                    {type: "saw"});
+        case ("triangle"):
+            this.out = new OscillatorNode(ctx,
+                    {type: "triangle"});
+        case ("saw"):
+            this.out = new OscillatorNode(ctx,
+                    {type: "sawtooth"});
+        case ("square"):
+            this.out = new OscillatorNode(ctx,
+                    {type: "square"});
+        case ("sine"):
+        default:
+            this.out = new OscillatorNode(ctx,
+                    {type: "sine"});
+    }
+    
+}
+
+let baseInstruments = {};
 
 // ----------------------------------------
 //             END INSTRUMENTS
@@ -261,9 +334,223 @@ function Note(freq, vol, vib, trem, detune, gliss={}) {
 //           HELPFUL FUNCTIONS
 // ----------------------------------------
 
+function setCharAt(str,index,chr) {
+    if(index > str.length-1) return str;
+    return str.substring(0,index) + chr + str.substring(index+1);
+}
+
+
+
 
 // ----------------------------------------
-//           END TRACK PLAYBACK
+//          END HELPFUL FUNCTIONS
+// ========================================
+
+
+
+// ========================================
+//             WHITE NOISE
+// ----------------------------------------
+
+
+
+
+// ----------------------------------------
+//            END WHITE NOISE
+// ========================================
+
+
+
+// ========================================
+//           MIDI NOTE BS
+// ----------------------------------------
+
+function midiToFreq(note, oct) {
+    index = (oct + 2) * 12;
+    if (note[0].toUpperCase() == note[0]) {
+        index += 12;
+        setCharAt(note, 0, note[0].toLowerCase());
+    }
+
+    switch (note) {
+        case "c":
+            index += 0;
+            break;
+        case "c#":
+            index += 1;
+            break;
+        case "d":
+            index += 2;
+            break;
+        case "d#":
+            index += 3;
+            break;
+        case "e":
+            index += 4;
+            break;
+        case "f":
+            index += 5;
+            break;
+        case "f#":
+            index += 6;
+            break;
+        case "g":
+            index += 7;
+            break;
+        case "g#":
+            index += 8;
+            break;
+        case "a":
+            index += 9;
+            break;
+        case "a#":
+            index += 10;
+            break;
+        case "b":
+            index += 11;
+            break;
+    }
+    out = midiNoteTable[index];
+    if (out === undefined) {
+        out = Math.pow(2, (index - 69)/12) * 440;
+    }
+
+    return out;
+}
+
+let midiNoteTable = [];
+
+midiNoteTable[0] = 8.175798915643707;
+midiNoteTable[1] = 8.661957218027252;
+midiNoteTable[2] = 9.177023997418988;
+midiNoteTable[3] = 9.722718241315029;
+midiNoteTable[4] = 10.300861153527183;
+midiNoteTable[5] = 10.913382232281373;
+midiNoteTable[6] = 11.562325709738575;
+midiNoteTable[7] = 12.249857374429663;
+midiNoteTable[8] = 12.978271799373287;
+midiNoteTable[9] = 13.75;
+midiNoteTable[10] = 14.567617547440307;
+midiNoteTable[11] = 15.433853164253883;
+midiNoteTable[12] = 16.351597831287414;
+midiNoteTable[13] = 17.323914436054505;
+midiNoteTable[14] = 18.354047994837977;
+midiNoteTable[15] = 19.445436482630058;
+midiNoteTable[16] = 20.601722307054366;
+midiNoteTable[17] = 21.826764464562746;
+midiNoteTable[18] = 23.12465141947715;
+midiNoteTable[19] = 24.499714748859326;
+midiNoteTable[20] = 25.956543598746574;
+midiNoteTable[21] = 27.5;
+midiNoteTable[22] = 29.13523509488062;
+midiNoteTable[23] = 30.86770632850775;
+midiNoteTable[24] = 32.70319566257483;
+midiNoteTable[25] = 34.64782887210901;
+midiNoteTable[26] = 36.70809598967594;
+midiNoteTable[27] = 38.890872965260115;
+midiNoteTable[28] = 41.20344461410875;
+midiNoteTable[29] = 43.653528929125486;
+midiNoteTable[30] = 46.2493028389543;
+midiNoteTable[31] = 48.999429497718666;
+midiNoteTable[32] = 51.91308719749314;
+midiNoteTable[33] = 55;
+midiNoteTable[34] = 58.27047018976124;
+midiNoteTable[35] = 61.7354126570155;
+midiNoteTable[36] = 65.40639132514966;
+midiNoteTable[37] = 69.29565774421802;
+midiNoteTable[38] = 73.41619197935188;
+midiNoteTable[39] = 77.78174593052023;
+midiNoteTable[40] = 82.4068892282175;
+midiNoteTable[41] = 87.30705785825097;
+midiNoteTable[42] = 92.4986056779086;
+midiNoteTable[43] = 97.99885899543733;
+midiNoteTable[44] = 103.82617439498628;
+midiNoteTable[45] = 110;
+midiNoteTable[46] = 116.54094037952248;
+midiNoteTable[47] = 123.47082531403103;
+midiNoteTable[48] = 130.8127826502993;
+midiNoteTable[49] = 138.59131548843604;
+midiNoteTable[50] = 146.8323839587038;
+midiNoteTable[51] = 155.56349186104046;
+midiNoteTable[52] = 164.81377845643496;
+midiNoteTable[53] = 174.61411571650194;
+midiNoteTable[54] = 184.9972113558172;
+midiNoteTable[55] = 195.99771799087463;
+midiNoteTable[56] = 207.65234878997256;
+midiNoteTable[57] = 220;
+midiNoteTable[58] = 233.08188075904496;
+midiNoteTable[59] = 246.94165062806206;
+midiNoteTable[60] = 261.6255653005986;
+midiNoteTable[61] = 277.1826309768721;
+midiNoteTable[62] = 293.6647679174076;
+midiNoteTable[63] = 311.12698372208087;
+midiNoteTable[64] = 329.6275569128699;
+midiNoteTable[65] = 349.2282314330039;
+midiNoteTable[66] = 369.9944227116344;
+midiNoteTable[67] = 391.99543598174927;
+midiNoteTable[68] = 415.3046975799451;
+midiNoteTable[69] = 440;
+midiNoteTable[70] = 466.1637615180899;
+midiNoteTable[71] = 493.8833012561241;
+midiNoteTable[72] = 523.2511306011972;
+midiNoteTable[73] = 554.3652619537442;
+midiNoteTable[74] = 587.3295358348151;
+midiNoteTable[75] = 622.2539674441618;
+midiNoteTable[76] = 659.2551138257398;
+midiNoteTable[77] = 698.4564628660078;
+midiNoteTable[78] = 739.9888454232688;
+midiNoteTable[79] = 783.9908719634985;
+midiNoteTable[80] = 830.6093951598903;
+midiNoteTable[81] = 880;
+midiNoteTable[82] = 932.3275230361799;
+midiNoteTable[83] = 987.7666025122483;
+midiNoteTable[84] = 1046.5022612023945;
+midiNoteTable[85] = 1108.7305239074883;
+midiNoteTable[86] = 1174.6590716696303;
+midiNoteTable[87] = 1244.5079348883237;
+midiNoteTable[88] = 1318.5102276514797;
+midiNoteTable[89] = 1396.9129257320155;
+midiNoteTable[90] = 1479.9776908465376;
+midiNoteTable[91] = 1567.981743926997;
+midiNoteTable[92] = 1661.2187903197805;
+midiNoteTable[93] = 1760;
+midiNoteTable[94] = 1864.6550460723597;
+midiNoteTable[95] = 1975.533205024496;
+midiNoteTable[96] = 2093.004522404789;
+midiNoteTable[97] = 2217.4610478149766;
+midiNoteTable[98] = 2349.31814333926;
+midiNoteTable[99] = 2489.0158697766474;
+midiNoteTable[100] = 2637.02045530296;
+midiNoteTable[101] = 2793.825851464031;
+midiNoteTable[102] = 2959.955381693075;
+midiNoteTable[103] = 3135.9634878539946;
+midiNoteTable[104] = 3322.437580639561;
+midiNoteTable[105] = 3520;
+midiNoteTable[106] = 3729.3100921447194;
+midiNoteTable[107] = 3951.066410048992;
+midiNoteTable[108] = 4186.009044809578;
+midiNoteTable[109] = 4434.922095629953;
+midiNoteTable[110] = 4698.63628667852;
+midiNoteTable[111] = 4978.031739553295;
+midiNoteTable[112] = 5274.04091060592;
+midiNoteTable[113] = 5587.651702928062;
+midiNoteTable[114] = 5919.91076338615;
+midiNoteTable[115] = 6271.926975707989;
+midiNoteTable[116] = 6644.875161279122;
+midiNoteTable[117] = 7040;
+midiNoteTable[118] = 7458.620184289437;
+midiNoteTable[119] = 7902.132820097988;
+midiNoteTable[120] = 8372.018089619156;
+midiNoteTable[121] = 8869.844191259906;
+midiNoteTable[122] = 9397.272573357044;
+midiNoteTable[123] = 9956.06347910659;
+midiNoteTable[124] = 10548.081821211836;
+midiNoteTable[125] = 11175.303405856126;
+midiNoteTable[126] = 11839.8215267723;
+midiNoteTable[127] = 12543.853951415975;
+
+// ----------------------------------------
+//           END MIDI NOTE BS
 // ========================================
 
 
