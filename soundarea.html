@@ -230,8 +230,10 @@ function Note(freq, vol, vib, trem, detune, gliss={}) {
 //           INSTRUMENT OBJECTS
 // ----------------------------------------
 
-function Instrument(oscs=new Osc(), vibrato=0, vibratoRate=10, tremolo=0, tremoloRate=10) {
+function Instrument(oscs=[new Osc()], vol=1, vibrato=0, vibratoRate=10, tremolo=0, tremoloRate=10) {
     this.out = ctx.createGain();
+    this.vol = vol;
+    this.out.gain.value = vol;
     this.oscs = oscs;
 
     this.vibrato = vibrato;
@@ -244,8 +246,8 @@ function Instrument(oscs=new Osc(), vibrato=0, vibratoRate=10, tremolo=0, tremol
                     });
 
     for (let i = 0; i < this.oscs.length; i++) {
-        this.vibratoGain.connect(oscs[i].out.detune);
-        this.oscs[i].start();
+        this.vibratoGain.connect(oscs[i].osc.detune);
+        this.oscs[i].osc.start();
     }
     
     this.tremolo = tremolo;
@@ -264,44 +266,58 @@ function Instrument(oscs=new Osc(), vibrato=0, vibratoRate=10, tremolo=0, tremol
                 continue;
             }
             if (this.oscs[i].type == "pitchednoise") {
-                this.oscs[i].detune.value = 
+                this.oscs[i].osc.detune.value = (440 - freq) * 100 * oscs[i].freqMult;
                 continue;
             }
+            this.oscs[i].osc.frequency.value = freq * oscs[i].freqMult;
+            continue;
         }
     }
 }
 
-function setInstFreq(freq) {
-
-}
-
 function Osc(type="sine", vol=1, detune=0, freqMult=1) {
     this.type = type;
-    // need switch here for noise types etc.
     this.freqMult = freqMult;
     this.detune = detune;
+    this.out = ctx.createGain();
+    this.volume = vol;
+    this.out.gain.value = vol;
     switch (type) {
+        case ("pitchednoise"):
         case ("noise"):
-            this.out = new OscillatorNode(ctx,
-                    {type: "saw"});
+            this.osc = new AudioBufferSourceNode(ctx, {
+                buffer: noiseBuffer,
+                });
+            this.osc.loop = true;
+            break;
         case ("triangle"):
-            this.out = new OscillatorNode(ctx,
+            this.osc = new OscillatorNode(ctx,
                     {type: "triangle"});
+            break;
         case ("saw"):
-            this.out = new OscillatorNode(ctx,
+            this.osc = new OscillatorNode(ctx,
                     {type: "sawtooth"});
+            break;
         case ("square"):
-            this.out = new OscillatorNode(ctx,
+            this.osc = new OscillatorNode(ctx,
                     {type: "square"});
+            break;
         case ("sine"):
         default:
-            this.out = new OscillatorNode(ctx,
+            this.osc = new OscillatorNode(ctx,
                     {type: "sine"});
+            break;
     }
     
 }
 
 let baseInstruments = {};
+baseInstruments.sine = Instrument();
+baseInstruments.square = Instrument(oscs=[new Osc(type="square")]);
+baseInstruments.triangle = Instrument(oscs=[new Osc(type="triangle")]);
+baseInstruments.saw = Instrument(oscs=[new Osc(type="saw")]);
+baseInstruments.noise = Instrument(oscs=[new Osc(type="noise")]);
+baseInstruments.pitchednoise = Instrument(oscs=[new Osc(type="pitchednoise")]);
 
 // ----------------------------------------
 //             END INSTRUMENTS
@@ -352,6 +368,15 @@ function setCharAt(str,index,chr) {
 //             WHITE NOISE
 // ----------------------------------------
 
+const noiseBuffer = new AudioBuffer({
+  length: ctx.sampleRate,
+  sampleRate: ctx.sampleRate,
+});
+
+const noiseData = noiseBuffer.getChannelData(0);
+for (let i = 0; i < bufferSize; i++) {
+  noiseData[i] = Math.random() * 2 - 1;
+}
 
 
 
