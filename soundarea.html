@@ -266,7 +266,44 @@ function parseTracksHeader(tracks) {
 
 
 function parseBody(body) {
-
+    let parsing_track_seg = false;
+    let parsing_single_track = false;
+    let track_segs = [];
+    let cur_track_seg = {header: "", seq: ""};
+    for (let i = 0; i < body.length; i++) {
+        body[i] = body[i].replace(/[\(\)]/g, "");
+        if (parsing_single_track && !parsing_track_seg && body[i].search('[') < body[i].search('t')) {
+            parsing_track_seg = true;
+            body[i] = body[i].search('[');
+        }
+        else {
+            parsing_single_track = false;
+        }
+        if (!parsing_track_seg && body[i].search("t") != -1) {
+            parsing_single_track = true;
+            let end_index = body[i].search('[');
+            if (end_index == -1) {
+                while (body[i].search('[') == -1) {
+                    cur_track_seg.header += body[i];
+                    i++;
+                }
+            }
+            cur_track_seg.header += body[i].slice(0, body[i].search('['));
+            body[i] = body[i].slice(body[i].search('['));
+            parsing_track_seg = true;
+        }
+        if (parsing_track_seg) {
+            while (body[i].search(']') == -1) {
+                cur_track_seg.seq += body[i];
+                i++;
+            }
+            cur_track_seg.seq += body[i].slice(0, body[i].search(']'));
+            parsing_track_seg = false;
+            parsing_single_track = true;
+            body[i] = body[i].slice(body[i].search(']'));
+            i--;
+        }
+    }
 }
 
 // ===       END BODY PARSING           === 
@@ -586,7 +623,9 @@ function TrackSeg(loop=0,
                     startTime=0,
                     sig=master.timeSig, 
                     div=master.beatDiv,
-                    vol=1)         {
+                    vol=1,
+                    oct=3
+                    )         {
 
     this.loop = loop;
     this.startTime = startTime;
@@ -595,6 +634,7 @@ function TrackSeg(loop=0,
     this.timeSig = sig;
     this.div = div;
     this.vol = vol;
+    this.oct = oct;
     this.noteQueue = [];
     this.nqPtr = 0;
 }
@@ -635,12 +675,11 @@ function Instrument(oscs=[new Osc()],  name="sine", vibrato=0, vibratoRate=10, t
     this.vibrato = vibrato;
     this.vibratoGain = ctx.createGain();
     this.vibratoGain.gain.value = vibrato * 10;
-    this.vibrato.connect(this.vibratoGain);
     this.vibratoOsc = new OscillatorNode(ctx,
                     {type: "sine",
                     frequency: vibratoRate
                     });
-
+    this.vibratoOsc.connect(this.vibratoGain);
     for (let i = 0; i < this.oscs.length; i++) {
         if (this.oscs[i].lfo) {
             continue;
@@ -652,11 +691,11 @@ function Instrument(oscs=[new Osc()],  name="sine", vibrato=0, vibratoRate=10, t
     this.tremolo = tremolo;
     this.tremoloGain = ctx.createGain();
     this.tremoloGain.gain.value = tremolo * 10;
-    this.tremolo.connect(this.tremoloGain);
     this.tremoloOsc = new OscillatorNode(ctx,
                     {type: "sine",
                     frequency: tremoloRate
                     });
+    this.tremoloOsc.connect(this.tremoloGain);
     this.tremoloGain.connect(this.out); 
 
     this.setFreq = function(freq) {
@@ -786,9 +825,6 @@ function setCharAt(str,index,chr) {
     if(index > str.length-1) return str;
     return str.substring(0,index) + chr + str.substring(index+1);
 }
-
-
-
 
 // ----------------------------------------
 //          END HELPFUL FUNCTIONS
