@@ -278,6 +278,8 @@ function parseBody(body) {
         }
         else {
             parsing_single_track = false;
+            track_segs.push(cur_track_seg);
+            cur_track_seg = {header: "", seq: ""};
         }
         if (!parsing_track_seg && body[i].search("t") != -1) {
             parsing_single_track = true;
@@ -304,6 +306,120 @@ function parseBody(body) {
             i--;
         }
     }
+    track_segs.push(cur_track_seg);
+    processTrackSegments(track_segs);
+}
+
+function processTrackSegments(track_segs) {
+    for (let i = 0; i < track_segs.length; i++) {
+        let base_params = processTrackSegHeader(track_segs[i].header); 
+    }
+}
+
+function processTrackSegHeader(header) {
+    let states = {
+        default: 0,
+        setTrackNo: 1,
+        setTrackSegNo: 2,
+        setOctave: 3,
+        setVol: 4,
+        setLoops: 5,
+        newInput: 6
+    };
+    let curValNotNull = false;
+    let curState = states.default;
+    let curParamVal = null;
+    let params = {
+        trackNo: null,
+        trackSegNo: -1,
+        octave: 3,
+        vol: 1,
+        loops: 1
+    };
+    for (let i = 0; i < header.length; i++) {
+        let char = header[i];
+        if (!isWhitespace(char)) {
+            continue;
+        }
+        switch (curState) {
+            case (states.default): 
+                curState = states.newInput;
+                break;
+
+            case (states.setTrackNo):
+                if (isNumeral(char)) {
+                    curParamVal += char;
+                }
+                else {
+                    params.trackNo = isNaN(Number(curParamVal)) ? params.trackNo : Number(curParamVal);
+                    curState = states.newInput;
+                }
+                break;
+
+            case (states.setTrackSegNo):
+                if (isNumeral(char)) {
+                    curParamVal += char;
+                }
+                else {
+                    params.trackSegNo = isNaN(Number(curParamVal)) ? params.trackNo : Number(curParamVal);
+                    curState = states.newInput;
+                }
+
+                break;
+            case (states.setOctave):
+                if (isNegNumeral(char)) {
+                    curParamVal += char;
+                }
+                else {
+                    params.octave = isNaN(Number(curParamVal)) ? params.trackNo : Number(curParamVal);
+                    curState = states.newInput;
+                }
+                break;
+            case (states.setVol):
+                if (isFracNumeral(char)) {
+                    curParamVal += char;
+                }
+                else {
+                    params.vol = isNaN(Number(curParamVal)) ? params.trackNo : Number(curParamVal);
+                    curState = states.newInput;
+                }
+                
+
+                break;
+            case (states.setLoops):
+                if (isNumeral(char)) {
+                    curParamVal += char;
+                }
+                else {
+                    params.vol = isNaN(Number(curParamVal)) ? params.trackNo : Number(curParamVal);
+                    curState = states.newInput;
+                }
+
+
+                break;
+        }
+        if (curState == states.newInput) {
+            curParamVal = "";
+            switch (char) {
+                case ('t'):
+                    curState = states.setTrackNo;
+                    break;
+                case ('o'):
+                    curState = states.setOctave;
+                    break;
+                case ('v'):
+                    curState = states.setVol;
+                    break;
+                case ('x'):
+                    curState = states.setLoops;
+                    break;
+                default:
+                    curState = states.default;
+                    break;
+            }
+        }
+    }
+    return params;
 }
 
 // ===       END BODY PARSING           === 
@@ -603,7 +719,6 @@ function Track(inst=baseInstruments.sine,
     this.instrument = instr;
     this.seq = seq;
     this.loop = loop;
-    this.timeTilQueued = 0;
     this.customInstrument = customInstrument;
     // needs to be set up later to be directed to master output
     this.trackOut = ctx.createGain();
@@ -648,7 +763,7 @@ function TrackSeg(loop=0,
 //              NOTE OBJECTS
 // ----------------------------------------
 
-function Note(freq, vol, vib, trem, detune, length, gliss={}) {
+function Note(freq, vol, vib, trem, detune, length, gliss=[]) {
     this.freq = freq;
     this.vol = vol;
     this.vib = vib;
@@ -656,7 +771,7 @@ function Note(freq, vol, vib, trem, detune, length, gliss={}) {
     this.detune = detune;
     // in samples
     this.length = length;  
-    this.gliss = {};
+    this.gliss = [];
 }
 
 // ----------------------------------------
@@ -824,6 +939,38 @@ isBuiltInInstrument.pitchednoise = true;
 function setCharAt(str,index,chr) {
     if(index > str.length-1) return str;
     return str.substring(0,index) + chr + str.substring(index+1);
+}
+
+// also from stackoverflow
+function isWhitespace(c) {
+    return c === ' '
+        || c === '\n'
+        || c === '\t'
+        || c === '\r'
+        || c === '\f'
+        || c === '\v'
+        || c === '\u00a0'
+        || c === '\u1680'
+        || c === '\u2000'
+        || c === '\u200a'
+        || c === '\u2028'
+        || c === '\u2029'
+        || c === '\u202f'
+        || c === '\u205f'
+        || c === '\u3000'
+        || c === '\ufeff'
+}
+
+function isNumeral(char) {
+    return /[0-9]/.test(char);
+}
+
+function isFracNumeral(char) {
+    return /[0-9.]/.test(char);
+}
+
+function isNegNumeral(char) {
+    return /[0-9\-]/.test(char);
 }
 
 // ----------------------------------------
