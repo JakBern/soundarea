@@ -340,11 +340,14 @@ function createTrackSegment(params, seq) {
         readVib:  5,
         readTrem: 6,
         readVol:  7,
-        readLen:  8
+        readTime: 8,
+        newInput: 9
     };
+    let curState = states.default;
     // note a character -- "r" for rest
     // base parameters shouldnt be used if null, use track params instead
-    let baseNoteParam = {note: "r", 
+    let baseNoteParam = {note: null,
+                    oct: null, 
                     freq: null, 
                     vol: null, 
                     vib: null, 
@@ -354,7 +357,74 @@ function createTrackSegment(params, seq) {
                     gliss: []};
     let curNoteParam = baseNoteParam;
     let curEffectVal = "";
-    let note = new Note()
+    let curTimeVal = 0;
+    for (let i = 0; i < seq.length; i++) {
+        let char = seq[i];
+        if (isWhitespace(char)) {
+            continue;
+        }
+        switch (curState) {
+            case (states.default):
+                curState = states.newInput;
+                break;
+            case (states.noteName):
+
+                break;
+            case (states.readNote):
+
+                break;
+            case (states.readRests):
+
+                break;
+            case (states.gliss):
+
+                break;
+            case (states.readVib):
+
+                break;
+            case (states.readTrem):
+
+                break;
+            case (states.readVol):
+
+                break;
+            case (states.readTime):
+
+                break;
+        }
+        if (curState == states.newInput) {
+            switch (true) {
+                case /[a-gA-G]/.test(char):
+                    curState = states.noteName;
+                    break;
+                case /-/.test(char):
+                    curState = states.readNote;
+                    note.length += 1;
+                    break;
+                case /_/.test(char):
+                    curState = states.readRest;
+                    break;
+                case /\\/.test(char):
+                    curState = states.gliss;
+                    break;
+                case /V/.test(char):
+                    curState = states.readVib;
+                    break;
+                case /T/.test(char):
+                    curState = states.readTrem;
+                    break;
+                case /v/.test(char):
+                    curState = states.readVol;
+                    break;
+                case /t/.test(char):
+                    curState = states.readTime;
+                    break;
+                default:
+                    continue;
+            }
+        }
+    }
+    
 }
 
 function processTrackSegHeader(header) {
@@ -697,8 +767,10 @@ function connectRouting(inst, oscs, routing) {
         switch (routing.dest) {
             case (-1): 
                 dest = inst.out;
+                break;
             default:
                 dest = oscs[routing.dest];
+                break;
         }
         for (let j = 0; j < routing[i].src.length; j++) {
             let src = routing[i].src[j];
