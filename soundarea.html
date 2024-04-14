@@ -312,8 +312,49 @@ function parseBody(body) {
 
 function processTrackSegments(track_segs) {
     for (let i = 0; i < track_segs.length; i++) {
-        let base_params = processTrackSegHeader(track_segs[i].header); 
+        let base_params = processTrackSegHeader(track_segs[i].header);
+        if (base_params.trackNo === null) {
+            continue;
+        }
+        else {
+            createTrackSegment(params, track_segs[i].seq);
+        }
     }
+}
+
+// params are 
+// - trackNo
+// - trackSegNo (-1 is auto)
+// - octave
+// - vol
+// - loops
+function createTrackSegment(params, seq) {
+    // need to add to length with each new note
+    let trackSeq = new TrackSeg(params.loops, params.vol, params.octave);
+    let states = {
+        default:  0,
+        noteName: 1, // need to fully read c#4 etc
+        readNote: 2,
+        readRest: 3,
+        gliss:    4,
+        readVib:  5,
+        readTrem: 6,
+        readVol:  7,
+        readLen:  8
+    };
+    // note a character -- "r" for rest
+    // base parameters shouldnt be used if null, use track params instead
+    let baseNoteParam = {note: "r", 
+                    freq: null, 
+                    vol: null, 
+                    vib: null, 
+                    trem: null, 
+                    detune: null, 
+                    length: 0, 
+                    gliss: []};
+    let curNoteParam = baseNoteParam;
+    let curEffectVal = "";
+    let note = new Note()
 }
 
 function processTrackSegHeader(header) {
@@ -724,6 +765,7 @@ function Track(inst=baseInstruments.sine,
     this.trackOut = ctx.createGain();
     // in samples
     this.length;
+    this.trackSeqPtr = 0;
 }
 
 // ----------------------------------------
@@ -735,17 +777,17 @@ function Track(inst=baseInstruments.sine,
 // ----------------------------------------
 
 function TrackSeg(loop=0,
+                    vol=1,
+                    oct=3,
                     startTime=0,
                     sig=master.timeSig, 
-                    div=master.beatDiv,
-                    vol=1,
-                    oct=3
+                    div=master.beatDiv
                     )         {
 
     this.loop = loop;
     this.startTime = startTime;
     // in samples
-    this.length;
+    this.length = 0;
     this.timeSig = sig;
     this.div = div;
     this.vol = vol;
